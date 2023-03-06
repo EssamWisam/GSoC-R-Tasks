@@ -1,0 +1,66 @@
+---
+title: Finding Several Local Minima using Optim
+output: html_document
+---
+
+Okay. Now checking the documentation for Optim, the interface seems to support 6 different optimization algoritms. And quite oddly none of which is gradient descent. At least there is limited memory BFGS, so let's go for that.
+
+```{r}
+# Define the Rastrigin function (N dimensions this time)
+Rastrigin <- function(x, n=2, A=5)    A*n + sum(x^2 - A*cos(2*pi*x))
+
+# Method will be L-BFGS-B
+method <- "L-BFGS-B"
+
+# Set a vector of initial values (formally, one would generate these randomly)
+initial_values <- list(c(1.11, 2.9), c(3.3, 12), c(6, 3), c(12, 16), c(0.3, 0.4))
+
+# Lets make a table for the results
+column_names <- c("initial_value", "optimized_value", "minimum_value")
+results <- matrix(NA, nrow = length(initial_values), ncol = 3, dimnames = list(NULL, column_names))
+
+# Loop through each initial value and run the optimization
+for (i in 1:length(initial_values)) {
+
+  # Run the optimization (assume 1000 iterations is enough)
+  result <- optim(par = initial_values[[i]], fn = Rastrigin, method = method, control = list(maxit = 1000))
+
+  # Store the results
+  results[i, "initial_value"] <- paste("(", paste(initial_values[[i]], collapse = ", "), ")", sep = "")
+  results[i, "optimized_value"] <- paste("(", paste(round(result$par, 3), collapse = ", "), ")", sep = "")
+  results[i, "minimum_value"] <- round(result$value, 3)
+}
+
+results
+```
+
+Interesting results. It's hard to tell what BFGS was thinking when it decided to converge to the local minimum at $(x, y) = (0, 0)$ from $(x, y) = (12, 16)$.
+
+Now let's try the other algorithms provided by Optim. 
+
+```{r}
+# Initial valuem
+initial_value <- c(1.11, 2.9)
+
+# The 5th algorithm, Brent only works for 1D functions
+methods <- c("BFGS", "SANN", "CG", "Nelder-Mead")
+
+# Lets make a table for the results
+column_names <- c("method", "optimized_value", "minimum_value")
+results <- matrix(NA, nrow = length(methods), ncol = 3, dimnames = list(NULL, column_names))
+
+# Loop through each method and run the optimization
+for (i in 1:length(methods)) {
+
+  # Run the optimization
+  result <- optim(par = initial_value, fn = Rastrigin, method = methods[i], control = list(maxit = 1000))
+
+  # Store the results
+  results[i, "method"] <- methods[i]
+  results[i, "optimized_value"] <- paste("(", paste(round(result$par, 3), collapse = ", "), ")", sep = "")
+  results[i, "minimum_value"] <- round(result$value, 3)
+}
+results
+```
+
+It's obvious here that SANN has the most spectacular results. It makes sense once you realize that its the only stochastic algorithm supported by optim.

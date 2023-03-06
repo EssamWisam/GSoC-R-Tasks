@@ -1,0 +1,106 @@
+---
+title: An R Markdown document converted from "./StochOptim.ipynb"
+output: html_document
+---
+
+## Stochastic Optimization
+
+After checking the "Global and Stochastic Optimization" section of the Optimization Task View. It's obvious that there are much more algorithms for global and stochastic optimization. We will consider simulated annealing, cross-enropy and genetic algorithms.
+
+### Simulated Annealing
+
+The documentation thankfully has a good example from which this is inspired.
+
+```{r}
+library(GenSA)
+
+Rastrigin <- function(x, A=10)    A*length(x) + sum(x^2 - A*cos(2*pi*x))
+
+
+dimension <- 30                          #  Let's make the problem harder
+global_min <- 0                          #  Something we know about the function that can help us stop the algorithm
+tol <- 1e-13                             #  We'll call the results "satisfactory" if we get within this tolerance of the global minimum
+lower <- rep(-5.12, dimension)           #  The lower bound of the components (again, as if we knew this about the function)
+upper <- rep(5.12, dimension)            #  The upper bound of the components 
+
+temperature <- 100                       #  The initial temperature (how often should it be bouncing initially)
+
+par = runif(dimension, lower, upper)     #  Generate a random starting point
+
+out <- GenSA(lower = lower, upper = upper, fn = Rastrigin, control=list(threshold.stop=global_min+tol, temperature=temperature))
+
+cat("The minimum value found was ", out$value, " at ", out$par[c(1:5)], "... after ", out$counts, " iterations.")
+```
+
+The algorithm specific parameters that GenSA takes are the initial temperature and two more parameters related to the visiting and acceptance distributions. All of these are important, it's quite odd that there is no way to set a custom schedule for the temperature but if there were that would have been important as well.
+
+The initial value is of course as well an important option but there are no magical ways to set it to obtain impressive results in the general sense.
+
+### Genetic Algorithm
+
+```{r}
+library(GA)
+
+Rastrigin <- function(x, A=10)    A*length(x) + sum(x^2 - A*cos(2*pi*x))
+
+dimension <- 30                          #  Let's make the problem harder
+lower <- rep(-5.12, dimension)           #  The lower bound of the components (again, as if we knew this about the function)
+upper <- rep(5.12, dimension)            #  The upper bound of the components 
+
+popsize = 20000                           # population size
+pcrossover = 0.4                          # probability of crossover
+pmutation = 0.03                          # probability of mutation
+elitism = 0.15                            # elitism
+
+
+out <- ga(type = "real-valued", fitness = function(x) -Rastrigin(x), lower = lower, upper = upper, 
+          run = 500, popSize=popsize, pcrossover = pcrossover, pmutation = pmutation, elitism=elitism)
+
+summary(out)
+```
+
+The genetic algorithm involves many important parameters. Four key examples of such parameters are the population size, survival rate (elitism), crossover and mutation probabilities.
+
+Setting such parameters to give better results can be sometimes tricky. The basic observation is that GA can be thought of as an instance of local beam search. Local beam search is surely optimal when the population size approach infinity. Thus, the easiest way to get better results while sacrificing computational time is to increase the population size. In this, we tried to increase it such that the minima reach is not that bad and the runtime is not that long.
+
+Other parameters like the probability of mutation won't always change the results as intended but sure a too high mutation probability will cause the algorithm to be just randomly searching.
+
+The GA library is nice enough to provide a way to plot how the fitness function changed over time through the search. This should be decreasing but remember we negated the fitness function.
+
+```{r}
+par(bg='white') 
+plot(out)
+```
+
+### Cross-Entropy Optimizer
+
+We will keep it easy this time and optimize the Rastrigin in 2D
+
+```{r}
+library(CEoptim)
+
+# Algorithm Parameters
+μ <- c(3.5,6.2)                                    # The initial mean
+σ <- c(12,14)                                        # The inital standard deviation
+ρ <- 0.3                                           # The elite proportion
+
+# Let's try a few different values of N to see which optimizes the function better
+Ns <- c(1000L, 5000L, 50000L)                      # The values of N to try
+
+# Lets make a table for the results
+results <- matrix(ncol=4, nrow=length(Ns))
+colnames(results) <- c("N", "Optimum Value", "Number of Iterations", "Convergence")
+
+
+# Loop through each value of N and run the optimization
+for (i in 1:length(Ns)) {
+  result <- CEoptim(Rastrigin, continuous=list(mean=μ , sd=σ), rho=ρ, N=Ns[i], maximize=FALSE, noImproveThr = 10)
+
+  results[i,] <- c(Ns[i], result$optimum, result$termination$niter, result$termination$convergence)
+}
+
+results
+```
+
+These seem like the poorest results we have so far. No doubts why this wasn't covered at my uni. Of course we can always cheat by letting the mean be something near $(0,0)$ to observe much better convergence.
+
